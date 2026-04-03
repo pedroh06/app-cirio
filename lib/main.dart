@@ -16,7 +16,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Círio de Nazaré',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
       home: const MapaPage(),
     );
   }
@@ -30,12 +34,23 @@ class MapaPage extends StatefulWidget {
 }
 
 class _MapaPageState extends State<MapaPage> {
-  final String apiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjVmMGVkMDQ0NjYxNjRhMTc5ZmUxNGM3YzRhMDFiNjBhIiwiaCI6Im11cm11cjY0In0=';
+  // API key do OpenRouteService (em produção, usar variável de ambiente)
+  final String apiKey =
+      'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjVmMGVkMDQ0NjYxNjRhMTc5ZmUxNGM3YzRhMDFiNjBhIiwiaCI6Im11cm11cjY0In0=';
 
+  // === PONTOS DE REFERÊNCIA ===
+  // Catedral Metropolitana (Cidade Velha) - ponto de INÍCIO do Círio
   final LatLng catedral = LatLng(-1.4557, -48.5047);
-  final LatLng basilica = LatLng(-1.4526, -48.4812);
-  final LatLng colegio = LatLng(-1.4519, -48.4796);
 
+  // Basílica de Nazaré - ponto de CHEGADA do Círio
+  final LatLng basilica = LatLng(-1.4528, -48.4811);
+
+  // Colégio Gentil Bittencourt - ponto de saída da Trasladação
+  final LatLng colegioGentil = LatLng(-1.4519, -48.4796);
+
+  // === ROTA DO CÍRIO ===
+  // Catedral Metropolitana -> Basílica de Nazaré (domingo de manhã)
+  // OBS: Pedro está refinando esses pontos
   final List<LatLng> pontosRotaCirio = [
     LatLng(-1.4557, -48.5047),
     LatLng(-1.4556, -48.5048),
@@ -45,7 +60,7 @@ class _MapaPageState extends State<MapaPage> {
     LatLng(-1.4528, -48.5038),
     LatLng(-1.4497, -48.5005),
     LatLng(-1.4498, -48.5005),
-    LatLng(-1.4492, -48.4995), //
+    LatLng(-1.4492, -48.4995),
     LatLng(-1.4508, -48.4980),
     LatLng(-1.4520, -48.4969),
     LatLng(-1.4516, -48.4964),
@@ -59,11 +74,38 @@ class _MapaPageState extends State<MapaPage> {
     LatLng(-1.4528, -48.4811),
   ];
 
+  // === ROTA DA TRASLADAÇÃO ===
+  // Colégio Gentil -> Catedral Metropolitana (sábado à noite)
+  // TODO: Preencher com as coordenadas reais do trajeto
+  // Dica: usar Google Maps, botão direito > copiar lat/lng ponto a ponto
+  final List<LatLng> pontosRotaTrasladacao = [
+    // INÍCIO - Colégio Gentil Bittencourt
+    LatLng(-1.4519, -48.4796),
+
+    // TODO: Adicionar pontos intermediários aqui
+    // Exemplo de como adicionar:
+    // LatLng(-1.4525, -48.4810),  // esquina da Av. Nazaré com ...
+    // LatLng(-1.4530, -48.4850),  // passando pela Praça ...
+    // LatLng(-1.4535, -48.4900),  // Av. Presidente Vargas
+    // ... mais pontos ao longo do trajeto ...
+
+    // FIM - Catedral Metropolitana (Cidade Velha)
+    LatLng(-1.4557, -48.5047),
+  ];
+
+  // === ESTADO DO APP ===
   List<LatLng> rotaAtual = [];
   LatLng? localizacaoUsuario;
   String legendaMapa = '';
+  Color corRota = Colors.blue;
   bool carregando = false;
 
+  // Controller do mapa pra poder reposicionar a câmera
+  final MapController mapController = MapController();
+
+  // === FUNÇÕES ===
+
+  /// Busca rota real (caminhando) via OpenRouteService
   Future<List<LatLng>> buscarRota(LatLng inicio, LatLng fim) async {
     final url =
         'https://api.openrouteservice.org/v2/directions/foot-walking?api_key=$apiKey&start=${inicio.longitude},${inicio.latitude}&end=${fim.longitude},${fim.latitude}';
@@ -73,62 +115,107 @@ class _MapaPageState extends State<MapaPage> {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final coords = data['features'][0]['geometry']['coordinates'] as List;
-      return coords.map((c) => LatLng(c[1].toDouble(), c[0].toDouble())).toList();
+      return coords
+          .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
+          .toList();
     } else {
-      throw Exception('Erro ao buscar rota');
+      throw Exception('Erro ao buscar rota: ${response.statusCode}');
     }
   }
 
-Future<void> mostrarRotaCirio() async {
+  /// Exibe a rota do Círio no mapa
+  void mostrarRotaCirio() {
     setState(() {
-      legendaMapa = 'Rota do Círio';
+      legendaMapa = 'Rota do Círio de Nazaré';
       rotaAtual = pontosRotaCirio;
+      corRota = Colors.blue;
     });
+
+    // Centraliza o mapa na rota
+    mapController.move(catedral, 14);
   }
 
-  Future<void> mostrarRotaTrasladacao() async {
+  /// Exibe a rota da Trasladação no mapa
+  void mostrarRotaTrasladacao() {
     setState(() {
       legendaMapa = 'Rota da Trasladação';
-      rotaAtual = pontosRotaCirio.reversed.toList();
+      rotaAtual = pontosRotaTrasladacao;
+      corRota = Colors.purple;
     });
+
+    // Centraliza no Colégio Gentil (início da Trasladação)
+    mapController.move(colegioGentil, 14);
   }
 
+  /// Busca localização do usuário e traça rota até o ponto inicial do Círio
   Future<void> mostrarMinhaRota() async {
     setState(() {
       carregando = true;
-      legendaMapa = 'Minha rota até o início';
+      legendaMapa = 'Calculando sua rota...';
     });
 
-    LocationPermission permissao = await Geolocator.requestPermission();
+    // Verifica permissão de localização
+    LocationPermission permissao = await Geolocator.checkPermission();
+    if (permissao == LocationPermission.denied) {
+      permissao = await Geolocator.requestPermission();
+    }
+
     if (permissao == LocationPermission.denied ||
         permissao == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Permissão de localização negada')),
-      );
-      setState(() => carregando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Permissão de localização negada.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() {
+        carregando = false;
+        legendaMapa = '';
+      });
       return;
     }
 
     try {
-      Position pos = await Geolocator.getCurrentPosition();
+      // Pega posição atual
+      Position pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
       final userLatLng = LatLng(pos.latitude, pos.longitude);
+
+      // Busca rota via API
       final rota = await buscarRota(userLatLng, catedral);
+
       setState(() {
         localizacaoUsuario = userLatLng;
         rotaAtual = rota;
+        legendaMapa = 'Sua rota até o início do Círio';
+        corRota = Colors.green;
       });
+
+      // Centraliza no usuário
+      mapController.move(userLatLng, 14);
     } catch (e) {
-      mostrarErro();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao buscar rota. Tente novamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() {
+        legendaMapa = '';
+      });
     } finally {
       setState(() => carregando = false);
     }
   }
 
-  void mostrarErro() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Erro ao buscar rota. Tente novamente.')),
-    );
-  }
+  // === INTERFACE ===
 
   @override
   Widget build(BuildContext context) {
@@ -137,82 +224,144 @@ Future<void> mostrarRotaCirio() async {
         title: const Text('Círio de Nazaré 2025'),
         backgroundColor: Colors.blue[800],
         foregroundColor: Colors.white,
+        centerTitle: true,
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
+          // Barra de botões
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            color: Colors.grey[100],
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ElevatedButton(
+                _buildBotao(
+                  label: 'Círio',
+                  icone: Icons.church,
+                  cor: Colors.blue,
                   onPressed: carregando ? null : mostrarRotaCirio,
-                  child: const Text('Círio'),
                 ),
-                ElevatedButton(
+                _buildBotao(
+                  label: 'Trasladação',
+                  icone: Icons.nights_stay,
+                  cor: Colors.purple,
                   onPressed: carregando ? null : mostrarRotaTrasladacao,
-                  child: const Text('Trasladação'),
                 ),
-                ElevatedButton(
+                _buildBotao(
+                  label: 'Minha Rota',
+                  icone: Icons.navigation,
+                  cor: Colors.green,
                   onPressed: carregando ? null : mostrarMinhaRota,
-                  child: const Text('Minha rota'),
                 ),
               ],
             ),
           ),
-          if (carregando)
-            const LinearProgressIndicator(),
+
+          // Indicador de carregamento
+          if (carregando) const LinearProgressIndicator(),
+
+          // Legenda da rota atual
           if (legendaMapa.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              color: corRota.withOpacity(0.1),
               child: Text(
                 legendaMapa,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: corRota,
+                  fontSize: 14,
+                ),
               ),
             ),
+
+          // Mapa
           Expanded(
             child: FlutterMap(
+              mapController: mapController,
               options: MapOptions(
                 initialCenter: catedral,
                 initialZoom: 14,
               ),
               children: [
+                // Tiles do OpenStreetMap
                 TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.cirio_app',
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.app_cirio',
                 ),
+
+                // Polyline da rota atual
                 if (rotaAtual.isNotEmpty)
                   PolylineLayer(
                     polylines: [
                       Polyline(
                         points: rotaAtual,
-                        strokeWidth: 4,
-                        color: Colors.blue,
+                        strokeWidth: 5,
+                        color: corRota,
                       ),
                     ],
                   ),
+
+                // Marcadores
                 MarkerLayer(
                   markers: [
+                    // Catedral (início do Círio)
                     Marker(
                       point: catedral,
-                      width: 80,
-                      height: 80,
+                      width: 100,
+                      height: 60,
                       child: const Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.location_pin, color: Colors.red, size: 36),
-                          Text('Início', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                          Icon(Icons.location_pin,
+                              color: Colors.red, size: 36),
+                          Text('Catedral',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red)),
                         ],
                       ),
                     ),
+
+                    // Basílica de Nazaré (chegada do Círio)
+                    Marker(
+                      point: basilica,
+                      width: 100,
+                      height: 60,
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.location_pin,
+                              color: Colors.orange, size: 36),
+                          Text('Basílica',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange)),
+                        ],
+                      ),
+                    ),
+
+                    // Localização do usuário (se disponível)
                     if (localizacaoUsuario != null)
                       Marker(
                         point: localizacaoUsuario!,
                         width: 80,
-                        height: 80,
+                        height: 60,
                         child: const Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.person_pin_circle, color: Colors.green, size: 36),
-                            Text('Você', style: TextStyle(fontSize: 10)),
+                            Icon(Icons.person_pin_circle,
+                                color: Colors.green, size: 36),
+                            Text('Você',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green)),
                           ],
                         ),
                       ),
@@ -222,6 +371,26 @@ Future<void> mostrarRotaCirio() async {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Widget helper pra criar os botões de forma consistente
+  Widget _buildBotao({
+    required String label,
+    required IconData icone,
+    required Color cor,
+    required VoidCallback? onPressed,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icone, size: 18),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: cor,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
