@@ -76,21 +76,30 @@ class _MapaPageState extends State<MapaPage> {
 
   // === ROTA DA TRASLADAÇÃO ===
   // Colégio Gentil -> Catedral Metropolitana (sábado à noite)
-  // TODO: Preencher com as coordenadas reais do trajeto
-  // Dica: usar Google Maps, botão direito > copiar lat/lng ponto a ponto
+  // Trajeto: Av. Nazaré → Av. Presidente Vargas → Blvd. Castilho França
+  //          → Av. Portugal → Rua Padre Champagnat → Catedral da Sé
   final List<LatLng> pontosRotaTrasladacao = [
-    // INÍCIO - Colégio Gentil Bittencourt
-    LatLng(-1.4519, -48.4796),
-
-    // TODO: Adicionar pontos intermediários aqui
-    // Exemplo de como adicionar:
-    // LatLng(-1.4525, -48.4810),  // esquina da Av. Nazaré com ...
-    // LatLng(-1.4530, -48.4850),  // passando pela Praça ...
-    // LatLng(-1.4535, -48.4900),  // Av. Presidente Vargas
-    // ... mais pontos ao longo do trajeto ...
-
-    // FIM - Catedral Metropolitana (Cidade Velha)
-    LatLng(-1.4557, -48.5047),
+    LatLng(-1.452115, -48.479615),  // Colégio Gentil (saída)
+    LatLng(-1.452145, -48.480599),  // Av. Nazaré
+    LatLng(-1.452207, -48.482821),  // Av. Nazaré
+    LatLng(-1.452281, -48.486444),  // Av. Nazaré
+    LatLng(-1.452875, -48.488857),  // Av. Nazaré
+    LatLng(-1.454215, -48.492794),  // chegando na Pres. Vargas
+    LatLng(-1.453209, -48.494388),  // Av. Presidente Vargas
+    LatLng(-1.452211, -48.496069),  // Av. Presidente Vargas
+    LatLng(-1.450452, -48.497190),  // Av. Presidente Vargas
+    LatLng(-1.449148, -48.498009),  // Av. Presidente Vargas
+    LatLng(-1.447974, -48.498750),  // Av. Presidente Vargas
+    LatLng(-1.448922, -48.499771),  // Blvd. Castilho França
+    LatLng(-1.449765, -48.500600),  // Blvd. Castilho França
+    LatLng(-1.451061, -48.502084),  // Blvd. Castilho França
+    LatLng(-1.452306, -48.503322),  // Av. Portugal
+    LatLng(-1.452821, -48.503842),  // Av. Portugal
+    LatLng(-1.453486, -48.503446),  // Rua Padre Champagnat
+    LatLng(-1.454452, -48.503579),  // Rua Padre Champagnat
+    LatLng(-1.455097, -48.504163),  // chegando na Catedral
+    LatLng(-1.455574, -48.504624),  // Catedral da Sé
+    LatLng(-1.455893, -48.504552),  // Catedral da Sé (chegada)
   ];
 
   // === ESTADO DO APP ===
